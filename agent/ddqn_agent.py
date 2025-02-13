@@ -88,6 +88,7 @@ class DoubleQAgent(Agent):
              epsilon_dec=epsilon_dec,  epsilon_end=epsilon_end,
              mem_size=mem_size, is_learning=is_learning)
 
+        self.action_space_n = action_space_n
         self.replace_q_target = replace_q_target
         self.q_func = QNN(observation_space_shape, action_space_n, 42).to(device)
         self.q_func_target = QNN(observation_space_shape, action_space_n, 42).to(device)
@@ -105,7 +106,7 @@ class DoubleQAgent(Agent):
             return np.argmax(action_values.cpu().data.numpy())
         else:
             # exploring: return a random action
-            return np.random.choice([i for i in range(4)])   
+            return np.random.choice([i for i in range(self.action_space_n)])   
         
         
     def learn(self):
