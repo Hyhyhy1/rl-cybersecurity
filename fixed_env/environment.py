@@ -48,7 +48,7 @@ class TrafficEnv(gym.Env):
         self.load_threshold = load_threshold
         self.hazard_index = hazard_index
 
-        self.request_buffer = [] # элемент массива (request, bool), true если пакет от нормального пользователя
+        self.request_buffer = [] # элемент массива (source ip, request, bool), true если пакет от нормального пользователя
         self.blocked_ips = set()
 
         self.current_data = None
