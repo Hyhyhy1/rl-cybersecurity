@@ -84,7 +84,7 @@ def handle_client(conn):
             break
 
         decoded_data = data.decode('utf-8')
-        logging.info(f"Получен пакет:{decoded_data}")
+        logging.info(f"Получен пакет: {decoded_data}")
 
         if decoded_data.strip() == 'get metrics':
             response = f"{CPU_LOAD} {MEMORY_USAGE}"

@@ -171,18 +171,10 @@ class TrafficEnv(gym.Env):
         
 
         return state, reward, done, info
-
-
-    def get_server_usage(self):
-        self.server.sendall(b'get server usage')
-        data = self.server.recv(1024)
-        cpu_usage, memory_usage, = data.decode('utf-8').split(' ')
-
-        return np.float32(cpu_usage)/100, np.float32(memory_usage)/100
     
 
     def get_reward(self, action, addr, is_user):
-        cpu_usage, memory_usage = self.get_server_usage()
+        cpu_usage, memory_usage = self.request_buffer[0][1][5]/100, self.request_buffer[0][1][6]/100
         max_load = max(cpu_usage, memory_usage)
         is_heavy_loaded = max_load >= self.load_threshold
         
@@ -270,6 +262,3 @@ if __name__ == "__main__":
 
     env = TrafficEnv()
     state = env.reset()
-    print(state)
-
-    print(env.request_buffer[0])
