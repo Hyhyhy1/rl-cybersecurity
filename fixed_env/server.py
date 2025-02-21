@@ -76,7 +76,7 @@ MEMORY_USAGE = 0.0
 def update_metrics():
     pass
 
-def handle_client(conn):
+def handle_client(conn, logging_flag):
     while True:
         data = conn.recv(1024)
 
@@ -84,7 +84,9 @@ def handle_client(conn):
             break
 
         decoded_data = data.decode('utf-8')
-        logging.info(f"Получен пакет: {decoded_data}")
+
+        if logging_flag:
+            logging.info(f"Получен пакет: {decoded_data}")
 
         if decoded_data.strip() == 'get metrics':
             response = f"{CPU_LOAD} {MEMORY_USAGE}"
@@ -94,13 +96,14 @@ def handle_client(conn):
             update_metrics()
 
 
-def start_server(host='127.0.0.1', port = 8090):
+def start_server(logging_flag=False, host='127.0.0.1', port = 8090):
     server = socket.socket()
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind((host, port))
     server.listen(5)
-    logging.info(f"Сервер запущен на {host}:{port}")
+    if logging_flag:
+        logging.info(f"Сервер запущен на {host}:{port}")
     
     while True:
         client, _ = server.accept()
-        threading.Thread(target=handle_client, args=(client,), daemon=True).start()
+        threading.Thread(target=handle_client, args=(client, logging_flag), daemon=True).start()

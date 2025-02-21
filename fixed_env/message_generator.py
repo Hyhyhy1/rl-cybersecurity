@@ -26,7 +26,8 @@ def send_messages(proxy_host='127.0.0.1', proxy_port=8080):
                 while True:
                     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                     s.sendall(generate_message())
-                    time.sleep(random.uniform(0.1, 0.5))
+#                    time.sleep(random.uniform(0.1, 0.5))
+                    time.sleep(0.1)
 
         except Exception as e:
             pass

@@ -9,22 +9,23 @@ import gymnasium as gym
 from gymnasium import spaces
 from collections import defaultdict
 
-""" from fixed_env.server import start_server
-from fixed_env.message_generator import start_generator """
+from fixed_env.server import start_server
+from fixed_env.message_generator import start_generator
 
-from server import start_server
-from message_generator import start_generator
+""" from server import start_server
+from message_generator import start_generator """
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 class TrafficEnv(gym.Env):
-    def __init__(self, proxy_host='127.0.0.1', proxy_port=8080,
+    def __init__(self, logging_flag=False, proxy_host='127.0.0.1', proxy_port=8080,
                     server_host='127.0.0.1', server_port=8090,
                     load_threshold=0.75, hazard_index=1):
         
         super(TrafficEnv).__init__()
+        self.logging_flag = logging_flag
         
-        app_server = threading.Thread(target=start_server, daemon=True)
+        app_server = threading.Thread(target=start_server, args=(logging_flag,), daemon=True)
         app_server.start()
 
         self.wait_for_server(server_host, server_port)
@@ -39,7 +40,7 @@ class TrafficEnv(gym.Env):
 
 
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32)
-        self.action_space = spaces.Discrete(3)
+        self.action_space = spaces.Discrete(2)
 
         self.state_data = np.zeros(5, dtype=np.float32)
         self.state_server = np.zeros(2, dtype=np.float32)
@@ -57,8 +58,8 @@ class TrafficEnv(gym.Env):
         self.request_count_data = defaultdict(int)
         self.request_delta_summ = defaultdict(int)
 
-
-        logging.info(f"Прокси-сервер запущен на {proxy_host}:{proxy_port}")
+        if logging_flag:
+            logging.info(f"Прокси-сервер запущен на {proxy_host}:{proxy_port}")
 
 
     def wait_for_server(self, host, port, timeout=10):
@@ -82,7 +83,9 @@ class TrafficEnv(gym.Env):
 
         with conn:
             
-            logging.info(f'Подключение от {addr}')
+            if self.logging_flag:
+                logging.info(f'Подключение от {addr}')
+
             data = conn.recv(1024).decode('utf-8')
             current_time = time.time()
             data, addr, is_user = data.split('@@')
@@ -120,7 +123,6 @@ class TrafficEnv(gym.Env):
         self.server.sendall(b'get metrics')
         server_data = self.server.recv(1024)
         cpu_usage, memory_usage = server_data.decode('utf-8').split(' ')
-        print(cpu_usage, memory_usage)
         self.state_server = np.array([np.float32(cpu_usage), np.float32(memory_usage)])
 
         self.request_buffer.append((addr,np.hstack((self.state_data, self.state_server)), is_user == 'True'))
@@ -149,7 +151,7 @@ class TrafficEnv(gym.Env):
     def step(self, action):
         self.step_count += 1
         
-        addr,_,is_user = self.request_buffer.pop(0)
+        addr,_,is_user = self.request_buffer[0]
         
         if action == 0:
             self.server.sendall(self.current_data.encode('utf-8'))
@@ -165,6 +167,8 @@ class TrafficEnv(gym.Env):
         #    self.blocked_ip_blocks.add(request_source_block)
 
         reward = self.get_reward(action, addr, is_user)
+        self.request_buffer.pop(0)
+        self.get_state()
         state = self.request_buffer[0][1]
         done = self.step_count >= 1000
         info = {}
@@ -199,7 +203,7 @@ class TrafficEnv(gym.Env):
                     return reward
                 
                 else:
-                    return ValueError(f"Uncnown action: {action}")
+                    return ValueError(f"Uncnown action when heavy loaded: {action}")
                 
             elif action == 3:
                 if action == 3:
@@ -217,7 +221,7 @@ class TrafficEnv(gym.Env):
                     return reward
 
                 else:
-                    return ValueError(f"Uncnown action: {action}")
+                    return ValueError(f"Uncnown action out of range when heavy loaded: {action}")
         
         else:
             if action != 3:
@@ -228,7 +232,7 @@ class TrafficEnv(gym.Env):
                     reward = -2
                     return reward
                 
-                elif is_user == False and action == 1: #False Negative
+                elif is_user == False and action == 0: #False Negative
                     reward = -1
                     return reward
                 
@@ -237,7 +241,7 @@ class TrafficEnv(gym.Env):
                     return reward
                 
                 else:
-                    return ValueError(f"Uncnown action: {action}")
+                    return ValueError(f"Uncnown action when not heavy loaded: {action}")
                 
             elif action == 3:
                 if action == 3:
@@ -255,10 +259,12 @@ class TrafficEnv(gym.Env):
                     return reward
 
                 else:
-                    return ValueError(f"Uncnown action: {action}")
+                    return ValueError(f"Uncnown action out of range when heavy loaded: {action}")
 
 
 if __name__ == "__main__":
 
-    env = TrafficEnv()
+    env = TrafficEnv(logging_flag=False)
     state = env.reset()
+    for i in range(100):
+        print(env.step(env.action_space.sample()))
