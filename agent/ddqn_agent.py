@@ -1,6 +1,6 @@
 import gymnasium as gym
 import matplotlib.pyplot as plt
-import time # for benchmarking
+import time
 import numpy as np
 
 import torch
@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
-import collections # For dequeue for the memory buffer
+import collections
 import random
 
 
@@ -17,10 +17,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class MemoryBuffer(object):
     def __init__(self, max_size):
         self.memory_size = max_size
-        self.trans_counter=0 # num of transitions in the memory
-                             # this count is required to delay learning
-                             # until the buffer is sensibly full
-        self.index=0         # current pointer in the buffer
+        self.transaction_counter=0
+        self.index=0
         self.buffer = collections.deque(maxlen=self.memory_size)
         self.transition = collections.namedtuple("Transition", field_names=["state", "action", "reward", "new_state", "terminal"])
 
@@ -28,7 +26,7 @@ class MemoryBuffer(object):
     def save(self, state, action, reward, new_state, terminal):
         t = self.transition(state, action, reward, new_state, terminal)
         self.buffer.append(t)
-        self.trans_counter = (self.trans_counter + 1) % self.memory_size
+        self.transaction_counter = (self.transaction_counter + 1) % self.memory_size
 
     def random_sample(self, batch_size):
         assert len(self.buffer) >= batch_size # should begin sampling only when sufficiently full
@@ -110,7 +108,7 @@ class DoubleQAgent(Agent):
         
         
     def learn(self):
-        if self.memory.trans_counter < self.batch_size: # wait before you start learning
+        if self.memory.transaction_counter < self.batch_size: # wait before you start learning
             return
             
         # 1. Choose a sample from past transitions:
@@ -128,7 +126,7 @@ class DoubleQAgent(Agent):
         self.optimizer.step()
         
         # 4. Update the target NN (every N-th step)
-        if self.memory.trans_counter % self.replace_q_target == 0: # wait before you start learning
+        if self.memory.transaction_counter % self.replace_q_target == 0: # wait before you start learning
             for target_param, local_param in zip(self.q_func_target.parameters(), self.q_func.parameters()):
                 target_param.data.copy_(local_param.data)
                 

@@ -9,8 +9,8 @@ import gymnasium as gym
 from gymnasium import spaces
 from collections import defaultdict
 
-from fixed_env.server import start_server
-from fixed_env.message_generator import start_generator
+from environments.v4.server import start_server
+from environments.v4.message_generator import start_generator
 
 """ from server import start_server
 from message_generator import start_generator """
@@ -50,7 +50,6 @@ class TrafficEnv(gym.Env):
         self.hazard_index = hazard_index
 
         self.request_buffer = [] # элемент массива (source ip, request, bool), true если пакет от нормального пользователя
-        self.blocked_ips = set()
 
         self.current_data = None
         self.request_last_timestamp = defaultdict(int)
@@ -60,6 +59,9 @@ class TrafficEnv(gym.Env):
 
         if logging_flag:
             logging.info(f"Прокси-сервер запущен на {proxy_host}:{proxy_port}")
+
+        for i in range(8):
+            start_generator()
 
 
     def wait_for_server(self, host, port, timeout=10):
@@ -87,11 +89,12 @@ class TrafficEnv(gym.Env):
                 logging.info(f'Подключение от {addr}')
 
             data = conn.recv(1024).decode('utf-8')
-            current_time = time.time()
-            data, addr, is_user = data.split('@@')
-            self.current_data = data
             
             if data:
+
+                current_time = time.time()
+                data, addr, is_user = data.split('@@')
+                self.current_data = data
 
                 msg_size = len(data.encode('utf-8'))#размер сообщения
                 
@@ -132,18 +135,21 @@ class TrafficEnv(gym.Env):
 
     def reset(self):
 
-        start_generator()
-
-
         self.state_data = np.zeros(5, dtype=np.float32)
         self.state_server = np.zeros(2, dtype=np.float32)
         self.step_count = 0
         self.request_buffer = []
 
+        self.current_data = None
+        self.request_last_timestamp.clear()
+        self.request_size_data.clear()
+        self.request_count_data.clear()
+        self.request_delta_summ.clear()
+
         for _ in range(100):
             self.get_state()
         
-        print(f'Shape of request_buffer: {len(self.request_buffer)}')
+        #print(f'Shape of request_buffer: {len(self.request_buffer)}')
 
         return self.request_buffer[0][1] #?
     
@@ -158,13 +164,6 @@ class TrafficEnv(gym.Env):
 
         elif action == 1:
             pass
-
-        elif action == 2:
-            self.blocked_ips.add(addr)
-
-        #elif action == 3:
-        #    request_source_block = self.features.get_netmask_from_ip(addr)
-        #    self.blocked_ip_blocks.add(request_source_block)
 
         reward = self.get_reward(action, addr, is_user)
         self.request_buffer.pop(0)
@@ -186,80 +185,45 @@ class TrafficEnv(gym.Env):
         reward = 0
 
         if is_heavy_loaded:
-            if action != 3:
-                if is_user == True and action == 0: #True negative
-                    return reward
+            if is_user == True and action == 0: #True negative
+                return reward
+            
+            elif is_user == True and (action == 1 or action == 2): #False Positive
+                reward = -2/(max_load / self.load_threshold * self.hazard_index)
+                return reward
+            
+            elif is_user == False and action == 0: #False Negative
+                reward = -(max_load / self.load_threshold * self.hazard_index)
+                return reward
+            
+            elif is_user == False and (action == 1 or action == 2): #True Positive
+                reward = max_load / self.load_threshold * self.hazard_index
+                return reward
+            
+            else:
+                return ValueError(f"Uncnown action when heavy loaded: {action}")
                 
-                elif is_user == True and (action == 1 or action == 2): #False Positive
-                    reward = -2/(max_load / self.load_threshold * self.hazard_index)
-                    return reward
-                
-                elif is_user == False and action == 0: #False Negative
-                    reward = -(max_load / self.load_threshold * self.hazard_index)
-                    return reward
-                
-                elif is_user == False and (action == 1 or action == 2): #True Positive
-                    reward = max_load / self.load_threshold * self.hazard_index
-                    return reward
-                
-                else:
-                    return ValueError(f"Uncnown action when heavy loaded: {action}")
-                
-            elif action == 3:
-                if action == 3:
-                    fp, tp = 0, 0
-                    target_adress_group = self.features.get_netmask_from_ip(addr)
-                    for i in range(1, len(self.request_buffer)):
-                        if self.features.get_netmask_from_ip(self.request_buffer[i][0]) == target_adress_group:
-                            if self.request_buffer[i][2] == True:
-                                fp+=1
-
-                            else:
-                                tp+=1
-                    
-                    reward = (max_load / self.load_threshold * self.hazard_index) * tp - (2 / (max_load / self.load_threshold * self.hazard_index) * fp)
-                    return reward
-
-                else:
-                    return ValueError(f"Uncnown action out of range when heavy loaded: {action}")
         
         else:
-            if action != 3:
-                if is_user == True and action == 0: #True negative
-                    return reward
-                
-                elif is_user == True and (action == 1 or action == 2): #False Positive
-                    reward = -2
-                    return reward
-                
-                elif is_user == False and action == 0: #False Negative
-                    reward = -1
-                    return reward
-                
-                elif is_user == False and (action == 1 or action == 2): #True Positive
-                    reward = 1
-                    return reward
-                
-                else:
-                    return ValueError(f"Uncnown action when not heavy loaded: {action}")
-                
-            elif action == 3:
-                if action == 3:
-                    fp, tp = 0, 0
-                    target_adress_group = self.features.get_netmask_from_ip(addr)
-                    for i in range(1, len(self.request_buffer)):
-                        if self.features.get_netmask_from_ip(self.request_buffer[i][0]) == target_adress_group:
-                            if self.request_buffer[i][2] == True:
-                                fp+=1
+            if is_user == True and action == 0: #True negative
+                reward = 1
+                return reward
+            
+            elif is_user == True and (action == 1 or action == 2): #False Positive
+                reward = -2
+                return reward
+            
+            elif is_user == False and action == 0: #False Negative
+                reward = -1
+                return reward
+            
+            elif is_user == False and (action == 1 or action == 2): #True Positive
+                reward = 1
+                return reward
+            
+            else:
+                return ValueError(f"Uncnown action when not heavy loaded: {action}")
 
-                            else:
-                                tp+=1
-                    
-                    reward = tp - 2 * fp
-                    return reward
-
-                else:
-                    return ValueError(f"Uncnown action out of range when heavy loaded: {action}")
 
 
 if __name__ == "__main__":

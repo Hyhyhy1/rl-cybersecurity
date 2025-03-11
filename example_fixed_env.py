@@ -1,4 +1,4 @@
-from fixed_env import environment
+from environments.v4 import environment
 from agent.ddqn_agent import DoubleQAgent
 import time
 import numpy as np
@@ -7,7 +7,7 @@ from datetime import datetime
 
 LEARN_EVERY = 4
 
-def train_agent(n_episodes=2000):
+def train_agent(n_episodes=30):
     # Настраиваем логирование
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     log_filename = f'training_log_{timestamp}.txt'
@@ -40,7 +40,6 @@ def train_agent(n_episodes=2000):
         state = env.reset()
         steps = 0
         while not (terminated):
-            env.get_state()
             action = agent.choose_action(state)
             new_state, reward, terminated, info = env.step(action)
             agent.save(state, action, reward, new_state, terminated)
@@ -52,15 +51,13 @@ def train_agent(n_episodes=2000):
                 
         eps_history.append(agent.epsilon)
         scores.append(score)
-        avg_score = np.mean(scores[max(0, i-100):(i+1)])
 
-        log_message = 'Episode {} in {:.2f} min. Expected total time for {} episodes: {:.0f} min. [{:.2f}/{:.2f}]'.format(
+        log_message = 'Episode {} in {:.2f} min. Expected total time for {} episodes: {:.0f} min. [{:.2f}]'.format(
             (i+1), 
             (time.time() - start)/60, 
             n_episodes, 
             (((time.time() - start)/(i+1))*n_episodes)/60, 
-            score, 
-            avg_score
+            score
         )
         
         logger.info(log_message)

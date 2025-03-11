@@ -1,0 +1,5 @@
+2025-03-04 22:13:45,589 - Episode 1 in 1.40 min. Expected total time for 30 episodes: 42 min. [207.00]
+2025-03-04 22:15:09,546 - Episode 2 in 2.80 min. Expected total time for 30 episodes: 42 min. [730.00]
+2025-03-04 22:16:33,645 - Episode 3 in 4.20 min. Expected total time for 30 episodes: 42 min. [865.00]
+2025-03-04 22:17:57,591 - Episode 4 in 5.60 min. Expected total time for 30 episodes: 42 min. [958.00]
+2025-03-04 22:19:22,023 - Episode 5 in 7.01 min. Expected total time for 30 episodes: 42 min. [976.00]
